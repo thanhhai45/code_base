@@ -1,0 +1,49 @@
+version: '3'
+services:
+  redis:
+    image: redis
+    volumes:
+      - ./source_be/tmp/redis:/data
+    ports:
+      - 6379:6379
+  worker:
+    build: 
+      context: ./source_be/
+    command: bundle exec sidekiq
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./source_be:/usr/src/backend-app
+    depends_on:
+      - db
+      - redis
+  db:
+    image: postgres
+    volumes:
+      - ./tmp/db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: password
+  backend:
+    build: ./source_be/
+    depends_on:
+      - db
+      - redis
+      - worker
+    volumes:
+      - ./source_be:/usr/src/backend-app
+    ports:
+      - "3001:3001"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      SIDEKIQ_REDIS_URL: redis://redis:6379/1
+  frontend:
+    build:
+      context: ./source_fe/
+    depends_on:
+      - backend
+    command: npm start
+    volumes:
+      - ./source_fe/:/usr/src/frontend-app
+      - ./source_fe/node_modules:/usr/src/frontend-app/node_modules
+    ports:
+      - "3000:3000"
